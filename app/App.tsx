@@ -6,11 +6,35 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { WeatherDescKo } from './WeatherDescKo';
 import { FontAwesome6, Fontisto } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const weatherApiKey = WEATHER_API_KEY;
+
+// 날씨 상태에 따른 그라디언트 색상
+const getWeatherGradient = (weatherId: number): string[] => {
+  if (weatherId >= 200 && weatherId < 300) {
+    // 천둥번개
+    return ['#283048', '#859398'];
+  } else if (weatherId >= 300 && weatherId < 600) {
+    // 비
+    return ['#4CA1AF', '#C4E0E5'];
+  } else if (weatherId >= 600 && weatherId < 700) {
+    // 눈
+    return ['#E0EAFC', '#CFDEF3'];
+  } else if (weatherId >= 700 && weatherId < 800) {
+    // 안개, 흐림
+    return ['#757F9A', '#D7DDE8'];
+  } else if (weatherId === 800) {
+    // 맑음
+    return ['#56CCF2', '#2F80ED'];
+  } else {
+    // 구름
+    return ['#bdc3c7', '#2c3e50'];
+  }
+};
 
 type DailyWeather = {
   dt: number;
@@ -34,26 +58,14 @@ const WeatherDesc = ({ day }: { day: DailyWeather }) => {
   const iconName = match?.icon ?? "question";
 
   return (
-    <View style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: '90%',
-      alignSelf: 'center',
-       }}>
-      <Text
-        style={[styles.weatherLabel, { flexShrink: 1 }]}
-        numberOfLines={1}
-        ellipsizeMode="tail"
-      >
-        {desc}
-      </Text>
+    <View style={styles.weatherDescContainer}>
       <Fontisto
         name={iconName as any}
-        size={45}
-        color="#00122e"
-        style={[styles.weatherIcon, { marginLeft: 10, paddingTop: 20 }]}
+        size={80}
+        color="rgba(255, 255, 255, 0.95)"
+        style={styles.weatherIcon}
       />
+      <Text style={styles.weatherLabel}>{desc}</Text>
     </View>
   );
 };
@@ -174,17 +186,6 @@ const App = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.cityCon}>
-        {/* {errorMsg && <Text style={styles.error}>{errorMsg}</Text>} */}
-        {location && (
-          <>
-            <Text style={styles.city}>{city}</Text>
-            {/* <Text style={styles.coord}>경도: {location.coords.longitude}</Text>
-            <Text style={styles.coord}>위도: {location.coords.latitude}</Text> */}
-          </>
-        )}
-      </View>
-      
       <ScrollView
         horizontal
         pagingEnabled
@@ -192,68 +193,88 @@ const App = () => {
         style={styles.weather}
       >
         {dailyWeather.length === 0 ? (
-          <View style={styles.weatherInner}>
-            <ActivityIndicator />
-          </View>
+          <LinearGradient
+            colors={['#56CCF2', '#2F80ED']}
+            style={[styles.weatherInner, { justifyContent: 'center', alignItems: 'center' }]}
+          >
+            <ActivityIndicator size="large" color="white" />
+          </LinearGradient>
         ) : (
-          <View style={styles.weatherInner}>
-            {dailyWeather.map((day) => {
-              const date = new Date(day.dt * 1000);
-              const dateString = date.toLocaleDateString('ko-KR', {
-                weekday: "short",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              });
-              // 요일 숫자+th/st/nd/rd 계산
-              const n = date.getDate();
-              const daySuffix = (n >= 11 && n <= 13) ? 'th' : ['st', 'nd', 'rd'][n % 10 - 1] || 'th';
-              const weekDayText = `${n}${daySuffix}`;
+          dailyWeather.map((day) => {
+            const date = new Date(day.dt * 1000);
+            const dateString = date.toLocaleDateString('ko-KR', {
+              month: "long",
+              day: "numeric",
+              weekday: "long",
+            });
+            const n = date.getDate();
+            const daySuffix = (n >= 11 && n <= 13) ? 'th' : ['st', 'nd', 'rd'][n % 10 - 1] || 'th';
+            const weekDayText = `${n}${daySuffix}`;
+            const gradientColors = getWeatherGradient(day.weather[0].id);
 
-              return (
-                <View style={styles.day} key={day.dt}>
+            return (
+              <LinearGradient
+                colors={gradientColors}
+                style={styles.day}
+                key={day.dt}
+              >
+                <View style={styles.topSection}>
+                  <Text style={styles.city}>{city}</Text>
                   <Text style={styles.regDate}>{dateString}</Text>
+                </View>
+
+                <View style={styles.mainWeatherSection}>
                   <WeatherDesc day={day} />
-                  <Text style={styles.temp}>
-                    {typeof day.temp.day === 'number' ? day.temp.day.toFixed(1) : day.temp.day}
-                  </Text>
-                  <Text style={{ position: "absolute", bottom: 440, right: 80, fontSize: 50 }}>º</Text>
-                  <View style={styles.forcastCon}>
-                    <View style={styles.forcastTextBox}>
-                      <Text style={styles.forcastTittle}>Weekly Forecast</Text>
-                      <Text style={styles.WeekDayText}>{weekDayText}</Text>
+                  <View style={styles.tempContainer}>
+                    <Text style={styles.temp}>
+                      {typeof day.temp.day === 'number' ? Math.round(day.temp.day) : day.temp.day}
+                    </Text>
+                    <Text style={styles.tempSymbol}>°C</Text>
+                  </View>
+                </View>
+
+                <View style={styles.forecastContainer}>
+                  <View style={styles.forecastHeader}>
+                    <Text style={styles.forecastTitle}>상세 정보</Text>
+                    <Text style={styles.weekDayText}>{weekDayText}</Text>
+                  </View>
+
+                  <View style={styles.forecastGrid}>
+                    <View style={styles.infoCard}>
+                      <View style={styles.iconCircle}>
+                        <FontAwesome6 name="wind" size={22} color="rgba(255,255,255,0.9)" />
+                      </View>
+                      <Text style={styles.infoLabel}>풍속</Text>
+                      <Text style={styles.infoValue}>{day.wind_speed.toFixed(1)}</Text>
+                      <Text style={styles.infoUnit}>m/s</Text>
                     </View>
-                    <View style={styles.forcastBox}>
-                      {/* 예시: 3개의 정보 박스 */}
-                      <View style={styles.inforbox}>
-                        <FontAwesome6 name="wind" size={24} color="white" />
-                        <Text style={styles.forcastBoxText}>풍속</Text>
-                        <Text style={styles.forcastBoxText}>{day.wind_speed} m/s</Text>
-                  
+
+                    <View style={styles.infoCard}>
+                      <View style={styles.iconCircle}>
+                        <FontAwesome6 name="droplet" size={22} color="rgba(255,255,255,0.9)" />
                       </View>
-                      <View style={styles.inforbox}>
-                        <FontAwesome6 name="water" size={24} color="white" />
-                        <Text style={styles.forcastBoxText}>습도</Text>
-                        <Text style={styles.forcastBoxText}>{day.humidity} %</Text>
-                       
+                      <Text style={styles.infoLabel}>습도</Text>
+                      <Text style={styles.infoValue}>{day.humidity}</Text>
+                      <Text style={styles.infoUnit}>%</Text>
+                    </View>
+
+                    <View style={styles.infoCard}>
+                      <View style={styles.iconCircle}>
+                        <FontAwesome6 name="gauge-high" size={22} color="rgba(255,255,255,0.9)" />
                       </View>
-                      <View style={styles.inforbox}>
-                        <FontAwesome6 name="gauge" size={24} color="white" />
-                        <Text style={styles.forcastBoxText}>기압</Text>
-                        <Text style={styles.forcastBoxText}>{day.pressure} hPa</Text>
-                        
-                      </View>
+                      <Text style={styles.infoLabel}>기압</Text>
+                      <Text style={styles.infoValue}>{day.pressure}</Text>
+                      <Text style={styles.infoUnit}>hPa</Text>
                     </View>
                   </View>
-                  {/* <Text style={styles.desc}>나는 햄복합니다~~ r</Text> */}
                 </View>
-              );
-            })}
-          </View>
+              </LinearGradient>
+            );
+          })
         )}
       </ScrollView>
-      
-      <StatusBar style="auto" />
+
+      <StatusBar style="light" />
     </View>
   );
 };
@@ -262,133 +283,172 @@ const App = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffe01a',
+    backgroundColor: '#000',
   },
 
-  weatherInner: {
-    width: '100%',
-    flexDirection: 'row',
-    // backgroundColor: 'red',
-  },
-  
-  forcastCon: {
-    width: '100%',
-    flex: 0.6,
-    // backgroundColor: 'green',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    paddingLeft: 30,
-    paddingRight: 30,
-    paddingTop: 10,
-    paddingBottom: 30,
-  },
-
-  forcastTextBox: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  forcastTittle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  
-  forcastBox: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'black',
-    justifyContent: 'space-between',
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 10,
-  },
-
-  WeekDayText: {
-    flex : 2,
-    fontSize: 20,
-    fontWeight: 'normal',
-    textAlign: 'right',
-    paddingBottom: 12,
-    paddingRight: 10,
-  
-  },
-  
-  cityCon: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    alignItems: 'center',
-  },
-  city: {
-    fontSize: 50,
-    fontWeight: 'bold',
-    paddingBottom: 20,
-    paddingTop: 50,
-  },
-  coord: {
-    marginTop: 10,
-    fontSize: 16,
-  },
-  error: {
-    marginTop: 10,
-    color: 'red',
-  },
   weather: {
     flex: 1,
   },
-  
+
+  weatherInner: {
+    width: SCREEN_WIDTH,
+    height: '100%',
+  },
+
   day: {
     width: SCREEN_WIDTH,
     height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 100,
+    paddingTop: 60,
+    paddingHorizontal: 25,
+    paddingBottom: 40,
   },
-  regDate: {
-    padding: 10,
-    paddingLeft: 15,
-    paddingRight: 15,
-    backgroundColor: 'black',
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: 'white',
-    borderRadius: 30,
-  },
-  weatherLabel: {
-    fontSize: 35,
-    fontWeight: 'bold',
+
+  topSection: {
     marginTop: 20,
-    color: 'black',
-    textAlign: 'center',
+    marginBottom: 30,
   },
-  temp: {
-    fontSize: 100,
-    color: 'black',
-    fontWeight: 'bold',
-    paddingBottom: 20,
+
+  city: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.95)',
+    marginBottom: 8,
+    letterSpacing: 0.5,
   },
-  desc: {
-    fontSize: 20,
-    fontWeight: 'normal',
-    color: 'black',
+
+  regDate: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
+    letterSpacing: 0.3,
   },
-  weatherIcon: {
-    fontSize: 45,
-    color: '#00122e',
-  },
-  forcastBoxText: {
-    color: 'white',
-    fontSize: 20,
-    textAlign: 'center',
-    padding: 8,
-    fontWeight: 'bold',
-  },
-  inforbox: {
-    alignItems: 'center',
+
+  mainWeatherSection: {
+    flex: 1,
     justifyContent: 'center',
-    padding: 10,
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+
+  weatherDescContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+
+  weatherIcon: {
+    marginBottom: 15,
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+
+  weatherLabel: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.95)',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+
+  tempContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+
+  temp: {
+    fontSize: 110,
+    fontWeight: '200',
+    color: 'rgba(255, 255, 255, 0.98)',
+    letterSpacing: -2,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 10,
+  },
+
+  tempSymbol: {
+    fontSize: 36,
+    fontWeight: '300',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 20,
+    marginLeft: 5,
+  },
+
+  forecastContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 25,
+    padding: 20,
+    backdropFilter: 'blur(10px)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+
+  forecastHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+
+  forecastTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.95)',
+    letterSpacing: 0.3,
+  },
+
+  weekDayText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+
+  forecastGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+
+  infoCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 18,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+
+  iconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  infoLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.75)',
+    marginBottom: 6,
+    letterSpacing: 0.2,
+  },
+
+  infoValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.95)',
+    letterSpacing: -0.5,
+  },
+
+  infoUnit: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 2,
   },
 });
 export default App;
